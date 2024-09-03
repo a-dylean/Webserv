@@ -49,6 +49,7 @@ void rmFromPollWatchlist(int fd)
 	{
 		if (pollFdsList[i].fd == fd)
 		{
+			close(pollFdsList[i].fd);
 			pollFdsList.erase(pollFdsList.begin() + i);
 			break;
 		}
@@ -121,7 +122,6 @@ void receiveRequest(int fd)
 		fullRequest.append(buffer, return_value);
 		ret_total += return_value;
 	}
-	std::cout << "ret_total" << ret_total << std::endl;
 	Request req(fullRequest);
 	req.printRequest(req);
 	req.setRequestState(RECEIVED);
@@ -151,7 +151,7 @@ int findCount(int fd)
 
 void runWebserver(void)
 {
-	int timeout = 1000;
+	int timeout = 500;
 
 	while (1)
 	{
@@ -172,15 +172,18 @@ void runWebserver(void)
 			{
 				if (findCount(fd) == 1)
 				{
+					std::cout << "Accepting connection for" << fd << std::endl;
 					acceptConnection(fd);
 				}
 				else
 				{
 					receiveRequest(fd);
 				}
+				std::cout << "fd count: " << findCount(fd) << std::endl;
 			}
-			else if (pollFdsList[i].revents & POLLOUT)
+			if (pollFdsList[i].revents & POLLOUT)
 			{
+				std::cout << "Sending response" << std::endl;
 				sendResponse(fd);
 			}
 			if (requests[fd].getRequestState() == SENT)
