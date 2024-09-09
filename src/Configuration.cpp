@@ -1,4 +1,4 @@
-#include "../include/Configuration.hpp"
+// #include "../include/Configuration.hpp"
 #include "Configuration.hpp"
 
 static std::string	getLocationPath(std::string const &line)
@@ -420,7 +420,7 @@ void	Configuration::printConfig() const
 	}
 }
 
-int	getClientMaxBodySize(BodySize const &bodySize)
+int	Configuration::getClientMaxBodySize(BodySize &bodySize)
 {
     int maxClientBodySize;
     std::stringstream ss(bodySize.value);
