@@ -39,6 +39,8 @@ public:
 	void handlePostRequest(Configuration &config);
 	void handleDeleteRequest(Configuration &config);
 	void setHeaders();
+	void handleErrorPage(std::vector<ServerBlock>::iterator it);
+	void setErrorBody(std::ifstream &file, std::stringstream &body);
 };
 
 

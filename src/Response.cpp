@@ -149,6 +149,63 @@ LocationBlock Response::getLocationBlock(std::vector<ServerBlock>::iterator it, 
 	return *location;
 }
 
+void Response::setErrorBody(std::ifstream &file, std::stringstream &body)
+{
+	std::string line;
+	while (std::getline(file, line))
+	{
+		body << line << std::endl;
+	}
+	file.close();
+	this->body = body.str();
+}
+
+void Response::handleErrorPage(std::vector<ServerBlock>::iterator it)
+{
+	// bool errorPageExists = false;
+
+	// if (it->errorPages.size() != 0)
+	// {
+	// 	for (std::map<std::string, std::string>::iterator it2 = it->errorPages.begin(); it2 != it->errorPages.end(); it2++)
+	// 	{
+	// 		if (it2->first == std::to_string(this->statusCode))
+	// 		{
+	// 			std::string filePath = it->root + "/" + it2->second;
+	// 			std::ifstream file(filePath.c_str());
+	// 			std::stringstream body;
+	// 			if (file.is_open())
+	// 				setErrorBody(file, body);
+	// 			else
+	// 			{
+	// 				this->statusCode = 500;
+	// 				std::string filePath = it->root + "/error500.html";
+	// 				std::ifstream file(filePath.c_str());
+	// 				if (file.is_open())
+	// 					setErrorBody(file, body);
+	// 			}
+	// 		}
+	// 	}
+	// 	errorPageExists = true;
+	// }
+	// if (errorPageExists == false)
+	// {
+	// 	//default error pages
+	// }
+	std::ifstream file("custom404.html");
+	std::stringstream body;
+	if (file.is_open())
+	{
+		std::string line;
+		while (std::getline(file, line))
+		{
+			body << line << std::endl;
+		}
+		file.close();
+		this->body = body.str();
+	}
+}
+
+
 void Response::handleRoot(std::string configPath, std::string requestUri)
 {
 	DIR *directoryPtr = opendir(configPath.c_str());
@@ -250,7 +307,8 @@ void Response::processServerBlock(Configuration &config, Request &req)
 			}	
 			else 
 				handleRoot(it->root, uri);
-		
+			if (this->statusCode != 200)
+				handleErrorPage(it);
 		}
 	}
 }
