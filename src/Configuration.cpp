@@ -419,3 +419,19 @@ void	Configuration::printConfig() const
 		std::cout << "\033[0;33;42m------------------\033[0m" << std::endl;
 	}
 }
+
+int	getClientMaxBodySize(BodySize const &bodySize)
+{
+    int maxClientBodySize;
+    std::stringstream ss(bodySize.value);
+   
+    ss >> maxClientBodySize;
+
+	if (bodySize.unit == "K")
+		maxClientBodySize *= 1024;
+	else if (bodySize.unit == "M")
+		maxClientBodySize *= 1024 * 1024;
+	else if (bodySize.unit == "G")
+		maxClientBodySize *= 1024 * 1024 * 1024;
+	return maxClientBodySize;
+}

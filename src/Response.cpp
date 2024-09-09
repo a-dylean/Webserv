@@ -239,6 +239,13 @@ void Response::processServerBlock(Configuration &config, Request &req)
 					statusCode = 404;
 					return;
 				}
+				int maxBodySize = config.getClientMaxBodySize(location.clientMaxBodySize);
+				if (req.getBody().size() > maxBodySize)
+				{
+					std::cout << "Payload too large" << std::endl;
+					statusCode = 413;
+					return;
+				}
 				handleRoot(location.root, uri);
 			}	
 			else 

@@ -86,6 +86,7 @@ class Configuration
 
 		// getters (We need getter for server_names, ports, etc)
 		std::vector<ServerBlock> const &getServerBlocks() const;
+		int	getClientMaxBodySize(BodySize const &bodySize);
 		//...
 		
 		// tools
