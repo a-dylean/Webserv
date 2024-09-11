@@ -75,7 +75,7 @@ void Request::setHeaders(std::stringstream &stream)
     std::string line;
     while (std::getline(stream, line))
     {
-        if (!line.empty() && line[line.size() - 1] == '\r')
+        if (!line.empty() && line[line.size() - 1] == CR)
         {
             line.erase(line.size() - 1);
         }
@@ -128,7 +128,7 @@ void Request::parseHeaderName(const std::string &str, std::string &name)
 {
     for (size_t i = 0; i < str.size(); ++i)
     {
-        if (str[i] == '\n' || str[i] == ':')
+        if (str[i] == LF || str[i] == ':')
             throw std::logic_error("Invalid header");
         name += str[i];
     }
@@ -138,7 +138,7 @@ void Request::parseHeaderValue(const std::string &str, std::string &value)
 {
     for (size_t i = 0; i < str.size(); ++i)
     {
-        if (str[i] == '\n')
+        if (str[i] == LF)
             throw std::logic_error("Invalid header value");
         value += str[i];
     }

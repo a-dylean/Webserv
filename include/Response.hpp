@@ -6,6 +6,7 @@
 #include <dirent.h>
 #include <unistd.h> 
 #include <sys/stat.h>
+#include <string.h>
 
 class Configuration;
 class Request;
@@ -19,6 +20,7 @@ private:
 	std::string headers;
 	std::string body;
 	std::string response;
+	std::string mimeType;
 	std::string getStatusMsg(int code);
 	void setBody(std::string const &body);
 	void processServerBlock(Configuration &config, Request &req);
@@ -39,6 +41,7 @@ public:
 	void handlePostRequest(Configuration &config);
 	void handleDeleteRequest(Configuration &config);
 	void setHeaders();
+	void setMimeType(std::string const &fileName);
 	void handleErrorPage(std::vector<ServerBlock>::iterator it);
 	void setErrorBody(std::ifstream &file, std::stringstream &body);
 };

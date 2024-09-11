@@ -1,5 +1,4 @@
-#ifndef CONFIGURATION_HPP
-#define CONFIGURATION_HPP
+#pragma once
 
 #include <iostream>
 #include <fstream>
@@ -9,6 +8,10 @@
 #include <cstddef>
 #include <sstream>
 #include <cstdlib>// for std::atoi
+
+#define CRLF "\r\n" // carriage return line feed
+#define LF '\n'
+#define CR '\r'
 
 enum http_method {
 	GET,
@@ -96,4 +99,3 @@ class Configuration
 		//...
 };
 
-#endif // CONFIGURATION_HPP

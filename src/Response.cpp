@@ -52,7 +52,7 @@ void Response::setBody(std::string const &body)
 void Response::setStatusLine()
 {
 	std::stringstream ss;
-	ss << req.getVersion() << " " << statusCode << " " << getStatusMsg(statusCode) << "\n";
+	ss << req.getVersion() << " " << statusCode << " " << getStatusMsg(statusCode) << LF;
 	statusLine = ss.str();
 }
 
@@ -61,15 +61,56 @@ void Response::createResponseStr()
 	std::stringstream ss;
 	setStatusLine();
 	setHeaders();
-	ss << statusLine << headers << body << "\n";
+	ss << statusLine << headers << body << LF;
 	response = ss.str();
 }
-
+void Response::setMimeType(std::string const &fileName)
+{
+	std::string extension = fileName.substr(fileName.find_last_of(".") + 1);
+	if (extension == "html")
+		mimeType = "text/html";
+	else if (extension == "css")
+		mimeType = "text/css";
+	else if (extension == "js")
+		mimeType = "text/javascript";
+	else if (extension == "jpg")
+		mimeType = "image/jpeg";
+	else if (extension == "jpeg")
+		mimeType = "image/jpeg";
+	else if (extension == "png")
+		mimeType = "image/png";
+	else if (extension == "gif")
+		mimeType = "image/gif";
+	else if (extension == "bmp")
+		mimeType = "image/bmp";
+	else if (extension == "ico")
+		mimeType = "image/x-icon";
+	else if (extension == "svg")
+		mimeType = "image/svg+xml";
+	else if (extension == "mp3")
+		mimeType = "audio/mpeg";
+	else if (extension == "mp4")
+		mimeType = "video/mp4";
+	else if (extension == "webm")
+		mimeType = "video/webm";
+	else if (extension == "ogg")
+		mimeType = "audio/ogg";
+	else if (extension == "wav")
+		mimeType = "audio/wav";
+	else if (extension == "avi")
+		mimeType = "video/x-msvideo";
+	else if (extension == "mpeg")
+		mimeType = "video/mpeg";
+	else if (extension == "txt")
+		mimeType = "text/plain";
+	else
+		mimeType = "application/octet-stream";
+}
 void Response::setHeaders()
 {
 	std::stringstream ss;
-	ss << "Content-Type: text/html\r\n"
-	   << "Content-Length: " << body.size() << "\r\n\r\n";
+	ss << "Content-Type: " << mimeType << CRLF
+	   << "Content-Length: " << body.size() << CRLF << CRLF;
 	headers = ss.str();
 }
 
@@ -254,11 +295,21 @@ void Response::handleRoot(std::string configPath, std::string requestUri)
 					}
 					file.close();
 					this->body = body.str();
+					if (requestUri == "/")
+					{
+						this->setMimeType("index.html");
+					}
+					else
+					{
+						this->setMimeType(fileName);
+					}
 					this->statusCode = 200;
+					break;
 				}
 				else
 				{
 					this->statusCode = 403;
+					break;
 				}
 			}
 		}
@@ -304,11 +355,9 @@ void Response::processServerBlock(Configuration &config, Request &req)
 					return;
 				}
 				handleRoot(location.root, uri);
-			}	
-			else 
+			}
+			else
 				handleRoot(it->root, uri);
-			if (this->statusCode != 200)
-				handleErrorPage(it);
 		}
 	}
 }
