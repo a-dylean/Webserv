@@ -83,6 +83,7 @@ void handleCGI(Configuration &Config, LocationBlock &location, Request &req, Res
     {
         // Child process
         close(pipefd[0]); // Close unused read end
+        dup2(pipefd[0], STDIN_FILENO); // Redirect stdin to pipe
         dup2(pipefd[1], STDOUT_FILENO); // Redirect stdout to pipe
         dup2(pipefd[1], STDERR_FILENO); // Redirect stderr to pipe
         close(pipefd[1]); // Close write end after duplicating

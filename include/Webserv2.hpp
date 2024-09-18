@@ -37,4 +37,5 @@ void acceptConnection(int fd);
 void receiveRequest(int fd);
 void sendResponse(int fd, std::string response);
 void runWebserver(Configuration &config);
-void	closeSockets();
+void closeSockets();
+void webserv(Configuration &config);
