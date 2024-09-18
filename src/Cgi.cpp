@@ -48,21 +48,110 @@ char **createEnv(Request &req, LocationBlock &location) {
 
     env[5] = NULL;
 
-    for (int j = 0; env[j]; j++) {
-        std::cout << "env[" << j << "] : " << env[j] << std::endl;
-    }
+    // for (int j = 0; env[j]; j++) {
+    //     std::cout << "env[" << j << "] : " << env[j] << std::endl;
+    // }
 
     return env;
 }
+
+//je veux le path du cgi script
+//je veux savoir s'il s'agit d'un dossier ou d'un fichier
+//si c'est un dossier, je veux parcourir les fichiers du dossier
+//puis verifier s'il s'agit bien d'un fichier executable
+
+bool isExecutable(std::string path) {
+    struct stat sb;
+    if (stat(path.c_str(), &sb) == 0 && sb.st_mode & S_IXUSR) // S_IXUSR : executable by user
+        return true;
+    return false;
+}
+
+// std::string getPath(LocationBlock location, std::string &uri, Response &res)
+// {
+//     if (uri == "/" || uri == location.cgiParams.begin()->second)
+//     {
+//         return location.cgiParams.begin()->second;
+//     }
+//     return "";
+// }
+
+
+// std::string getPath(const LocationBlock location, std::string &uri, Response &res)
+// {
+//     if (!uri.empty() && uri == '/')
+//         return ("./www/cgi-bin/test.py");
+//     if (uri.empty()) //CHECK LATER
+//     {
+//         return ("./www/cgi-bin/test.py");
+//     }
+//    std::string path = location.root + uri;
+//    DIR *directoryPtr = opendir(path.c_str());
+//    if (directoryPtr == NULL)
+//     {
+//         std::cout << "PATH: " << path << std::endl;
+//         std::cerr << "opendir failed" << std::endl;
+//         if (errno == ENOENT)
+//         {
+//            res.setStatusCode(404);
+//            return "";
+//         }
+//         else if (errno == EACCES)
+//         {
+//             res.setStatusCode(403);
+//             return "";
+//         }
+//         else
+//         {
+//            res.setStatusCode(500);
+//            return "";
+//         }
+//     }
+//     else
+//     {
+//         struct dirent *dir;
+//         while ((dir = readdir(directoryPtr)) != NULL)
+//         {
+//             std::string fileName = dir->d_name;
+//             if (fileName == "." || fileName == "..")
+//                 continue;
+//             // std::cout << location.root + uri << std::endl;
+//             // std::cout << "fileName: " << fileName << std::endl;
+//             if (!uri.empty() && uri[uri.size() - 1] != '/')
+//                 uri += "/";
+//             if (isFile(location.root + uri + fileName) && isExecutable(location.root + uri + fileName))
+//             {
+//                 closedir(directoryPtr);
+//                 return (location.root + uri + fileName);
+//             }
+//         }
+//         closedir(directoryPtr);
+//     }
+//     return ("./www/cgi-bin/test.py");
+// }
+
+// if uri != / we return error
+// when we have / we redirect towards the file that is in the config at cgi 
+
 
 void handleCGI(Configuration &Config, LocationBlock &location, Request &req, Response &res)
 {
     // printCgiParams(location.cgiParams);
     char **env = createEnv(req, location);
-    std::string cgiPathWithArgs = "./www/cgi-bin/test.py";
+    // std::string cgiPathWithArgs = "./www/cgi-bin/test.py";
+    std::string uri = req.getUri();
+    std::string cgiPathWithArgs = location.cgiParams.begin()->second;;
     std::stringstream cgiOutput;
-    std::cout << "CGI PATH: " << cgiPathWithArgs << std::endl;
-
+    // if (cgiPathWithArgs.empty())
+    // {
+    //     res.setStatusCode(404); //find out why we get stuck whenever we have an error -> no ctrlC possible
+    //     return;
+    // }
+    if (!isExecutable(cgiPathWithArgs))
+    {
+        res.setStatusCode(403);
+        return;
+    }
     int pipefd[2];
     if (pipe(pipefd) == -1)
     {
