@@ -25,6 +25,26 @@
 #include <poll.h>
 #include <ctime>
 
+#include <stdlib.h>
+
+
+
+
+#include <cerrno>
+#include <cstring>
+#include <cstdio>
+#include <cstdlib>
+#include <poll.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <vector>
+
+
+
+
+
 #define MAX_CLIENTS 32
 #define BUFFER_SIZE 1024
 #define TIMEOUT 500
@@ -36,5 +56,7 @@
 extern int  uploadNb;
 
 void    runWebServer(Configuration &config);
+
+void server_loop(const Configuration &config);
 
 #endif // WEBSERV_HPP

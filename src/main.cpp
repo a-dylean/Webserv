@@ -11,6 +11,7 @@ int	main(int ac, char **av)
 		Configuration	config(defaultConfigPath);
 		
 		runWebServer(config);
+		// server_loop(config);
 	}
 	catch (std::exception &e) {
 		std::cerr << e.what() << std::endl;
