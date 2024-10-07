@@ -25,6 +25,7 @@ char **createEnv(Request &req, LocationBlock &location)
 void handleCGI(Configuration &Config, LocationBlock &location, Request &req, Response &res)
 {
     char **env = createEnv(req, location);
+    //should be taken from config
     std::string cgiPathWithArgs = "./www/cgi-bin/test.py";
     std::stringstream cgiOutput;
     std::cout << "CGI PATH: " << cgiPathWithArgs << std::endl;
