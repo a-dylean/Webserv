@@ -9,7 +9,7 @@ int	main(int ac, char **av)
 	try
 	{
 		Configuration	config(defaultConfigPath);
-		
+		config.printConfig();
 		runWebServer(config);
 	}
 	catch (std::exception &e) {

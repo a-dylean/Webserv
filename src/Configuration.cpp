@@ -462,6 +462,8 @@ void	Configuration::parseLocationDirective(std::string &line, LocationBlock &loc
 	else if (key == "return")
 		setReturn(locationBlock.redirects, locationBlock.redirection, split);
 	else if (key == "cgi")
+		pushSplit(locationBlock.cgiExtensions, split);
+	else if (key == "cgi_param")
 		setCgi(locationBlock.cgiParams, split);
 	else if (key == "allowed_methods")
 		setAllowedMethods(locationBlock.methods, split);
@@ -521,6 +523,8 @@ void	Configuration::parseServerDirective(std::string const &line, ServerBlock &s
 	else if (key == "return")
 		setReturn(serverBlock.redirects, serverBlock.redirection, split);
 	else if (key == "cgi")
+		pushSplit(serverBlock.cgiExtensions, split);
+	else if (key == "cgi_param")
 		setCgi(serverBlock.cgiParams, split);
 	else if (key == "allowed_methods")
 		setAllowedMethods(serverBlock.methods, split);
@@ -725,6 +729,11 @@ void	Configuration::printConfig() const
 			std::cout << "  cgiParams: ";
 			for (std::map<std::string, std::string>::const_iterator it3 = it2->cgiParams.begin(); it3 != it2->cgiParams.end(); ++it3)
 				std::cout << it3->first << " " << it3->second << " ";
+			std::cout << std::endl;
+
+			std::cout << "  cgi Extensions: ";
+			for (std::vector<std::string>::const_iterator it3 = it2->cgiExtensions.begin(); it3 != it2->cgiExtensions.end(); ++it3)
+				std::cout << *it3 << " ";
 			std::cout << std::endl;
 
 			std::cout << "  methods (" << it2->methods.size() << "): ";

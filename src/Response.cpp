@@ -355,14 +355,26 @@ void Response::handleUploadFiles(Configuration &config, LocationBlock &location,
 void Response::handleGetRequest(Configuration &config, LocationBlock location)
 {
 	std::string uri = req.getUri();
-	// std::cout << "URI WE WANNA SEEE: \n" << uri << std::endl;
-	if (url end with .py and .py is specified in config)
-		handleCGI(config, location, req, *this);
-	else
+	if (!location.cgiExtensions.empty())
 	{
-		getBody(req.getUri(), location);
-		return;
+		for (std::vector<std::string>::iterator it = location.cgiExtensions.begin(); it != location.cgiExtensions.end(); it++)
+		{
+			if (uri.find(*it) != std::string::npos)
+			{
+				handleCGI(config, location, req, *this);
+				return;
+			}
+		}
+		struct stat fileStat;
+		if (stat((location.root + uri).c_str(), &fileStat) == -1)
+		{
+			this->statusCode = 404;
+			setMimeType("html");
+			return;
+		}
 	}
+	getBody(req.getUri(), location);
+	return;
 }
 
 void Response::handlePostRequest(Configuration &config, LocationBlock location)

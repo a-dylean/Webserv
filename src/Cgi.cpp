@@ -35,10 +35,11 @@ char **createEnv(Request &req, LocationBlock &location)
     std::stringstream ss;
     std::string uri = req.getUri();
 
+    
     if (uri == "/submit_comment")
     {
         // std::cout << "URIHERETEST: " << uri << std::endl;
-        scriptName = location.cgiParams[".py"];
+        // scriptName = location.cgiParams[".py"];
         std::string keyword = uri;
         if (location.pathInfo == true)
             pathInfo = getPathInfo(uri, keyword);
@@ -152,6 +153,7 @@ void    handleCGI(Configuration &Config, LocationBlock &location, Request &req, 
     struct stat         st;
     
     // std::cout << "CGI PATH: " << cgiPathWithArgs << std::endl;
+    std::cout << "CGI PATH: " << cgiPathWithArgs << std::endl;
     if (cgiPathWithArgs == "")
     {
         std::cerr << "error in getting cgi path" << std::endl;
