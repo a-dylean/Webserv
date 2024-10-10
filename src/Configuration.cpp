@@ -1,7 +1,11 @@
 #include "../include/Configuration.hpp"
 #include "Configuration.hpp"
 
-static void	printSplit(std::vector<std::string> split)
+// TODO :
+// add default location block even if we have some location blocks
+// need a function to comapre location blocks and if we don't have a default one, add it
+
+static void printSplit(std::vector<std::string> split)
 {
 	std::cout << "split size : " << split.size() << std::endl;
 	std::cout << "split : ";
@@ -10,41 +14,41 @@ static void	printSplit(std::vector<std::string> split)
 	std::cout << std::endl;
 }
 
-static bool	isValidHost(std::string const &host)
+static bool isValidHost(std::string const &host)
 {
-	size_t	dot = 0;
+	// size_t	dot = 0;
 
 	if (host.empty())
 		return false;
-	if (host == "localhost")
-		return true;
-	for (size_t i = 0; i < host.size(); i++)
-	{
-		if (host.at(i) == '.')
-			dot++;
-	}
-	if (dot != 3 || host.find_first_of("0123456789.") == std::string::npos)
-		return false;
-	if (host.find_first_not_of("0123456789.") != std::string::npos)
-		return false;
-	if (host.find_first_of(".") == 0 || host.find_last_of(".") == host.size() - 1)
-		return false;
-	for (size_t i = 0; i < host.size(); i++)
-	{
-		if (host.at(i) == '.')
-		{
-			if (host.at(i + 1) == '.')
-				return false;
-		}
-	}
+	// if (host == "localhost")
+	// 	return true;
+	// for (size_t i = 0; i < host.size(); i++)
+	// {
+	// 	if (host.at(i) == '.')
+	// 		dot++;
+	// }
+	// if (dot != 3 || host.find_first_of("0123456789.") == std::string::npos)
+	// 	return false;
+	// if (host.find_first_not_of("0123456789.") != std::string::npos)
+	// 	return false;
+	// if (host.find_first_of(".") == 0 || host.find_last_of(".") == host.size() - 1)
+	// 	return false;
+	// for (size_t i = 0; i < host.size(); i++)
+	// {
+	// 	if (host.at(i) == '.')
+	// 	{
+	// 		if (host.at(i + 1) == '.')
+	// 			return false;
+	// 	}
+	// }
 	return true;
 }
 
-static std::vector<std::string>	stringSplit(std::string const &line, char delim)
+static std::vector<std::string> stringSplit(std::string const &line, char delim)
 {
-	std::vector<std::string>	res;
-	std::string					word;
-	std::stringstream			ss(line);
+	std::vector<std::string> res;
+	std::string word;
+	std::stringstream ss(line);
 
 	while (std::getline(ss, word, delim))
 	{
@@ -54,10 +58,10 @@ static std::vector<std::string>	stringSplit(std::string const &line, char delim)
 	return res;
 }
 
-static void	initServerBlock(ServerBlock &serverBlock)
+static void initServerBlock(ServerBlock &serverBlock)
 {
-	serverBlock.port = 8080;
-	serverBlock.host = "localhost";
+	serverBlock.hostPort.first = "localhost";
+	serverBlock.hostPort.second = 8080;
 	serverBlock.serverNames.clear();
 	serverBlock.root = "./www";
 	serverBlock.clientMaxBodySize.value = "0";
@@ -74,9 +78,9 @@ static void	initServerBlock(ServerBlock &serverBlock)
 	serverBlock.listenHasBeenSet = false;
 }
 
-static void	initLocationBlock(LocationBlock &locationBlock)
+void initLocationBlock(LocationBlock &locationBlock)
 {
-	locationBlock.path = "";
+	locationBlock.path = "/";
 	locationBlock.alias = "";
 	locationBlock.root = "";
 	locationBlock.clientMaxBodySize.value = "";
@@ -87,19 +91,21 @@ static void	initLocationBlock(LocationBlock &locationBlock)
 	locationBlock.pathInfo = false;
 	locationBlock.indexes.clear();
 	locationBlock.errorPages.clear();
-	locationBlock.uploadLocation = "";
+	locationBlock.uploadLocation = "./www/upload";
+	locationBlock.cgiParams.clear();
 	locationBlock.redirects.clear();
+	locationBlock.redirection = false;
 	locationBlock.cgiParams.clear();
 	locationBlock.methods.clear();
 }
 
-static void	pushServerBlock(std::vector<ServerBlock> &serverBlocks, ServerBlock &serverBlock)
+static void pushServerBlock(std::vector<ServerBlock> &serverBlocks, ServerBlock &serverBlock)
 {
 	if (serverBlock.serverNames.empty())
 		serverBlock.serverNames.push_back("webserv");
 	if (serverBlock.locationBlocks.empty())
 	{
-		LocationBlock	locationBlock;
+		LocationBlock locationBlock;
 
 		initLocationBlock(locationBlock);
 		locationBlock.root = serverBlock.root;
@@ -111,11 +117,11 @@ static void	pushServerBlock(std::vector<ServerBlock> &serverBlocks, ServerBlock 
 	serverBlocks.push_back(serverBlock);
 }
 
-static BodySize	createBodySize(std::string const &value)
+static BodySize createBodySize(std::string const &value)
 {
-	BodySize	bodySize;
-	std::string	unit;
-	std::string	number;
+	BodySize bodySize;
+	std::string unit;
+	std::string number;
 
 	if (value.empty() || value.at(0) == '\0' || value == "0")
 	{
@@ -142,7 +148,7 @@ static BodySize	createBodySize(std::string const &value)
 	return bodySize;
 }
 
-static bool	isHttpCode(std::string const &code)
+static bool isHttpCode(std::string const &code)
 {
 	if (code.size() != 3)
 		return false;
@@ -151,9 +157,9 @@ static bool	isHttpCode(std::string const &code)
 	return true;
 }
 
-static void	setClientMaxBodySize(BodySize &clientMaxBodySize, int &bodySize, std::vector<std::string> split)
+static void setClientMaxBodySize(BodySize &clientMaxBodySize, int &bodySize, std::vector<std::string> split)
 {
-	std::stringstream	ss;
+	std::stringstream ss;
 
 	if (split.size() != 1)
 		throw std::runtime_error("client max body size usage : {SIZE}[UNIT] (42M or 300K or 9G)");
@@ -168,9 +174,9 @@ static void	setClientMaxBodySize(BodySize &clientMaxBodySize, int &bodySize, std
 		bodySize *= 1024 * 1024 * 1024;
 }
 
-static void	setAllowedMethods(std::vector<http_method> &methods, std::vector<std::string> split)
+static void setAllowedMethods(std::vector<http_method> &methods, std::vector<std::string> split)
 {
-	std::vector<std::string>	methodsSplit;
+	std::vector<std::string> methodsSplit;
 
 	if (split.size() < 1)
 	{
@@ -206,7 +212,7 @@ static void	setAllowedMethods(std::vector<http_method> &methods, std::vector<std
 	}
 }
 
-static void	setCgi(std::map<std::string, std::string> &cgiParams, std::vector<std::string> split)
+static void setCgi(std::map<std::string, std::string> &cgiParams, std::vector<std::string> split)
 {
 	if (split.size() != 2)
 		throw std::runtime_error("cgi directive must have an extension and a file");
@@ -218,13 +224,12 @@ static void	setCgi(std::map<std::string, std::string> &cgiParams, std::vector<st
 		throw std::runtime_error("double cgi directive for the same extension : " + split[0]);
 }
 
-
 /* TODO : change type variable and it's not allowed to have duplicates */
-static void	setReturn(std::map<int, std::string> &redirects, bool &redirection, std::vector<std::string> split)
+static void setReturn(std::map<int, std::string> &redirects, bool &redirection, std::vector<std::string> split)
 {
-	std::stringstream	ss;
-	int					code;
-	
+	std::stringstream ss;
+	int code;
+
 	if (!redirects.empty())
 		throw std::runtime_error("return directive must be unique");
 	redirection = false;
@@ -244,7 +249,7 @@ static void	setReturn(std::map<int, std::string> &redirects, bool &redirection, 
 		throw std::runtime_error("return directive must have a code and an uri or only an uri");
 }
 
-static void	setErrorPage(std::map<std::string, std::string> &errorPages, std::vector<std::string> split)
+static void setErrorPage(std::map<std::string, std::string> &errorPages, std::vector<std::string> split)
 {
 	if (split.size() < 2)
 		throw std::runtime_error("error_page directive must have a code and an uri");
@@ -257,18 +262,18 @@ static void	setErrorPage(std::map<std::string, std::string> &errorPages, std::ve
 	}
 }
 
-static bool	isServerBlock(std::string const &line)
+static bool isServerBlock(std::string const &line)
 {
-	std::vector<std::string>	split = stringSplit(line, ' ');
-	
+	std::vector<std::string> split = stringSplit(line, ' ');
+
 	if (split[0] == "server" && split[1] == "{")
 		return true;
 	return false;
 }
 
-static bool	isLocationBlock(std::string const &line)
+static bool isLocationBlock(std::string const &line)
 {
-	std::vector<std::string>	split = stringSplit(line, ' ');
+	std::vector<std::string> split = stringSplit(line, ' ');
 
 	if (line.find("location"))
 		return false;
@@ -279,16 +284,15 @@ static bool	isLocationBlock(std::string const &line)
 	return false;
 }
 
-static bool	isDirective(std::string const &line)
+static bool isDirective(std::string const &line)
 {
-	std::stringstream	ss(line);
-	std::string			word;
-	std::string			dir[13] = {
-		"listen", "server_name", "index", "root", 
-		"client_max_body_size", "autoindex", "error_page", 
-		"return", "cgi", "allowed_methods", "alias", 
-		"path_info", "upload_location"
-	};
+	std::stringstream ss(line);
+	std::string word;
+	std::string dir[13] = {
+		"listen", "server_name", "index", "root",
+		"client_max_body_size", "autoindex", "error_page",
+		"return", "cgi", "allowed_methods", "alias",
+		"path_info", "upload_location"};
 
 	if (isServerBlock(line))
 		throw std::runtime_error("A server block need to be closed before starting new one");
@@ -303,13 +307,13 @@ static bool	isDirective(std::string const &line)
 	return false;
 }
 
-static void	trimWhiteSpaces(std::string &str)
+static void trimWhiteSpaces(std::string &str)
 {
 	str.erase(str.find_last_not_of(" \t") + 1);
 	str.erase(0, str.find_first_not_of(" \t"));
 }
 
-static bool	isLineToIgnore(std::string line)
+static bool isLineToIgnore(std::string line)
 {
 	if (line.empty())
 		return true;
@@ -320,7 +324,7 @@ static bool	isLineToIgnore(std::string line)
 	return false;
 }
 
-static void	setBooleans(std::string const &key, std::string const &value, bool &toFill, std::vector<std::string> split)
+static void setBooleans(std::string const &key, std::string const &value, bool &toFill, std::vector<std::string> split)
 {
 	if (split.size() != 1)
 		throw std::runtime_error("This directive '" + key + "' allow \"on\" or \"off\"");
@@ -331,7 +335,7 @@ static void	setBooleans(std::string const &key, std::string const &value, bool &
 		toFill = true;
 }
 
-static void	inheritanceServerToLocations(std::vector<ServerBlock> &m_serverBlocks)
+static void inheritanceServerToLocations(std::vector<ServerBlock> &m_serverBlocks)
 {
 	for (std::vector<ServerBlock>::iterator it = m_serverBlocks.begin(); it != m_serverBlocks.end(); ++it)
 	{
@@ -364,10 +368,10 @@ static void	inheritanceServerToLocations(std::vector<ServerBlock> &m_serverBlock
 	}
 }
 
-static void	setListen(std::string const &value, ServerBlock &serverBlock, std::vector<std::string> split)
+static void setListen(std::string const &value, ServerBlock &serverBlock, std::vector<std::string> split)
 {
-	std::stringstream	ss;
-	std::string 		port;
+	std::stringstream ss;
+	std::string port;
 
 	if (serverBlock.listenHasBeenSet)
 		throw std::runtime_error("Listen directive must be unique inside a server block");
@@ -384,47 +388,47 @@ static void	setListen(std::string const &value, ServerBlock &serverBlock, std::v
 	}
 	if (value.find_first_of(':') != std::string::npos)
 	{
-		serverBlock.host = value.substr(0, value.find(':'));
-		if (!isValidHost(serverBlock.host))
-			throw std::runtime_error("Invalid host '" + serverBlock.host + "'");
+		serverBlock.hostPort.first = value.substr(0, value.find(':'));
+		if (!isValidHost(serverBlock.hostPort.first))
+			throw std::runtime_error("Invalid host '" + serverBlock.hostPort.first + "'");
 		ss << value.substr(value.find(':') + 1);
 		if (ss.str().find_first_not_of("0123456789") != std::string::npos)
 			throw std::runtime_error("Port must be a number.");
-		ss >> serverBlock.port;
+		ss >> serverBlock.hostPort.second;
 	}
 	else
 	{
 		ss << value;
 		if (ss.str().find_first_not_of("0123456789") != std::string::npos)
 			throw std::runtime_error("Port must be a number.");
-		ss >> serverBlock.port;
+		ss >> serverBlock.hostPort.second;
 	}
 	serverBlock.listenHasBeenSet = true;
 }
 
-static void	setStringValue(std::string const &key, std::string &valueToSet, std::vector<std::string> split)
+static void setStringValue(std::string const &key, std::string &valueToSet, std::vector<std::string> split)
 {
 	if (split.size() != 1)
 		throw std::runtime_error("This directive '" + key + "' need only one value");
 	valueToSet = split[0];
 }
 
-static void	pushSplit(std::vector<std::string> &dst, std::vector<std::string> toPush)
+static void pushSplit(std::vector<std::string> &dst, std::vector<std::string> toPush)
 {
 	if (dst.empty())
 	{
 		dst = toPush;
-		return ;
+		return;
 	}
 	for (std::vector<std::string>::iterator it = toPush.begin(); it != toPush.end(); ++it)
 		dst.push_back(*it);
 }
 
-void	Configuration::parseLocationDirective(std::string &line, LocationBlock &locationBlock)
+void Configuration::parseLocationDirective(std::string &line, LocationBlock &locationBlock)
 {
-	std::vector<std::string>	split;
-	std::string					str = line;
-	std::string					key;
+	std::vector<std::string> split;
+	std::string str = line;
+	std::string key;
 
 	if (str.at(str.size() - 1) != ';')
 		throw std::runtime_error("Directive '" + str + "' must end with a semicolon");
@@ -456,6 +460,8 @@ void	Configuration::parseLocationDirective(std::string &line, LocationBlock &loc
 	else if (key == "return")
 		setReturn(locationBlock.redirects, locationBlock.redirection, split);
 	else if (key == "cgi")
+		pushSplit(locationBlock.cgiExtensions, split);
+	else if (key == "cgi_param")
 		setCgi(locationBlock.cgiParams, split);
 	else if (key == "allowed_methods")
 		setAllowedMethods(locationBlock.methods, split);
@@ -463,11 +469,11 @@ void	Configuration::parseLocationDirective(std::string &line, LocationBlock &loc
 		throw std::runtime_error("Unknown directive '" + key + "'");
 }
 
-void	Configuration::parseLocationBlock(ServerBlock &serverBlock, std::string const &locationLine, std::stringstream &ss)
+void Configuration::parseLocationBlock(ServerBlock &serverBlock, std::string const &locationLine, std::stringstream &ss)
 {
-	std::vector<std::string>	split = stringSplit(locationLine, ' ');
-	LocationBlock				locationBlock;
-	std::string					line;
+	std::vector<std::string> split = stringSplit(locationLine, ' ');
+	LocationBlock locationBlock;
+	std::string line;
 
 	initLocationBlock(locationBlock);
 	locationBlock.path = split[1];
@@ -484,11 +490,11 @@ void	Configuration::parseLocationBlock(ServerBlock &serverBlock, std::string con
 	serverBlock.locationBlocks.push_back(locationBlock);
 }
 
-void	Configuration::parseServerDirective(std::string const &line, ServerBlock &serverBlock)
+void Configuration::parseServerDirective(std::string const &line, ServerBlock &serverBlock)
 {
-	std::vector<std::string>	split;
-	std::string					str = line;
-	std::string					key;
+	std::vector<std::string> split;
+	std::string str = line;
+	std::string key;
 
 	if (str.at(str.size() - 1) != ';')
 		throw std::runtime_error("Directive '" + str + "' must end with a semicolon");
@@ -497,7 +503,7 @@ void	Configuration::parseServerDirective(std::string const &line, ServerBlock &s
 	if (split.size() == 0)
 		throw std::runtime_error("Invalid directive '" + str + "'");
 	key = split[0];
-	split.erase(split.begin());	
+	split.erase(split.begin());
 	if (key == "autoindex")
 		setBooleans(key, split[0], serverBlock.autoindex, split);
 	else if (key == "root")
@@ -515,6 +521,8 @@ void	Configuration::parseServerDirective(std::string const &line, ServerBlock &s
 	else if (key == "return")
 		setReturn(serverBlock.redirects, serverBlock.redirection, split);
 	else if (key == "cgi")
+		pushSplit(serverBlock.cgiExtensions, split);
+	else if (key == "cgi_param")
 		setCgi(serverBlock.cgiParams, split);
 	else if (key == "allowed_methods")
 		setAllowedMethods(serverBlock.methods, split);
@@ -522,10 +530,10 @@ void	Configuration::parseServerDirective(std::string const &line, ServerBlock &s
 		throw std::runtime_error("Unknown directive '" + key + "'");
 }
 
-void	Configuration::parseServerBlock(std::stringstream &ss)
+void Configuration::parseServerBlock(std::stringstream &ss)
 {
-	ServerBlock	server;
-	std::string	line;
+	ServerBlock server;
+	std::string line;
 
 	curlyBrackets++;
 	initServerBlock(server);
@@ -553,12 +561,11 @@ void	Configuration::parseServerBlock(std::stringstream &ss)
 	pushServerBlock(m_serverBlocks, server);
 }
 
-
 Configuration::Configuration(std::string const &t_configFile) : m_configFile(t_configFile), curlyBrackets(0)
 {
-	std::ifstream		file(m_configFile.c_str());
-	std::string			line;
-	std::stringstream	ss;
+	std::ifstream file(m_configFile.c_str());
+	std::string line;
+	std::stringstream ss;
 
 	if (!file)
 		throw std::runtime_error("Cannot open file " + m_configFile);
@@ -582,7 +589,7 @@ Configuration::Configuration(std::string const &t_configFile) : m_configFile(t_c
 
 Configuration::Configuration()
 {
-	ServerBlock	server;
+	ServerBlock server;
 
 	initServerBlock(server);
 	pushServerBlock(m_serverBlocks, server);
@@ -597,10 +604,10 @@ std::vector<ServerBlock> const &Configuration::getServerBlocks() const
 	return m_serverBlocks;
 }
 
-const int	Configuration::getBodySize(BodySize const &bodySize)
+int Configuration::getBodySize(BodySize const &bodySize)
 {
-	std::stringstream	ss;
-	int					weight;
+	std::stringstream ss;
+	int weight;
 
 	ss << bodySize.value;
 	ss >> weight;
@@ -613,44 +620,44 @@ const int	Configuration::getBodySize(BodySize const &bodySize)
 	return weight;
 }
 
-std::vector<int>	Configuration::getPorts() const
+std::vector<int> Configuration::getPorts() const
 {
-	std::vector<int>	ports;
+	std::vector<int> ports;
 
 	for (std::vector<ServerBlock>::const_iterator it = m_serverBlocks.begin(); it != m_serverBlocks.end(); ++it)
-		ports.push_back(it->port);
+		ports.push_back(it->hostPort.second);
 	return ports;
 }
 
-void	Configuration::printConfig() const
+void Configuration::printConfig() const
 {
-	for(std::vector<ServerBlock>::const_iterator it = m_serverBlocks.begin(); it != m_serverBlocks.end(); ++it)
+	for (std::vector<ServerBlock>::const_iterator it = m_serverBlocks.begin(); it != m_serverBlocks.end(); ++it)
 	{
 		std::cout << "\033[0;33;42m----- SERVER -----\033[0m" << std::endl;
-		
+
 		// LISTEN
-		std::cout << "port: " << it->port << std::endl;
-		std::cout << "host: " << it->host << std::endl;
-		
+		std::cout << "port: " << it->hostPort.second << std::endl;
+		std::cout << "host: " << it->hostPort.first << std::endl;
+
 		// SERVER NAMES
 		std::cout << "serverNames: ";
 		for (std::vector<std::string>::const_iterator it2 = it->serverNames.begin(); it2 != it->serverNames.end(); ++it2)
 			std::cout << *it2 << " ";
 		std::cout << std::endl;
-		
+
 		// ROOT
 		std::cout << "root: " << it->root << std::endl;
-		
+
 		// ERROR PAGES
 		std::cout << "errorPages: ";
 		for (std::map<std::string, std::string>::const_iterator it2 = it->errorPages.begin(); it2 != it->errorPages.end(); ++it2)
 			std::cout << it2->first << ":" << it2->second << " ";
 		std::cout << std::endl;
-		
+
 		// CLIENT MAX BODY SIZE
 		std::cout << "clientMaxBodySize: " << it->clientMaxBodySize.value << " " << it->clientMaxBodySize.unit << std::endl;
 		std::cout << "bodySize: " << it->bodySize << std::endl;
-		
+
 		// AUTOINDEX
 		std::cout << "autoindex: " << (it->autoindex ? "on" : "off") << std::endl;
 
@@ -681,7 +688,7 @@ void	Configuration::printConfig() const
 
 		// METHODS
 		std::cout << "methods: ";
-		for (std::vector<http_method>::const_iterator it2 = it->methods.begin(); it2 != it-> methods.end(); ++it2)
+		for (std::vector<http_method>::const_iterator it2 = it->methods.begin(); it2 != it->methods.end(); ++it2)
 			std::cout << *it2 << " ";
 		std::cout << std::endl;
 
@@ -701,12 +708,12 @@ void	Configuration::printConfig() const
 			for (std::vector<std::string>::const_iterator it3 = it2->indexes.begin(); it3 != it2->indexes.end(); ++it3)
 				std::cout << *it3 << " ";
 			std::cout << std::endl;
-			
+
 			std::cout << "  errorPages: ";
 			for (std::map<std::string, std::string>::const_iterator it3 = it2->errorPages.begin(); it3 != it2->errorPages.end(); ++it3)
 				std::cout << it3->first << ":" << it3->second << " ";
 			std::cout << std::endl;
-			
+
 			std::cout << "  uploadLocation: " << it2->uploadLocation << std::endl;
 
 			std::cout << "  redirects: ";
@@ -721,12 +728,16 @@ void	Configuration::printConfig() const
 				std::cout << it3->first << " " << it3->second << " ";
 			std::cout << std::endl;
 
+			std::cout << "  cgi Extensions: ";
+			for (std::vector<std::string>::const_iterator it3 = it2->cgiExtensions.begin(); it3 != it2->cgiExtensions.end(); ++it3)
+				std::cout << *it3 << " ";
+			std::cout << std::endl;
+
 			std::cout << "  methods (" << it2->methods.size() << "): ";
-			for (std::vector<http_method>::const_iterator it3 = it2->methods.begin(); it3 != it2-> methods.end(); ++it3)
+			for (std::vector<http_method>::const_iterator it3 = it2->methods.begin(); it3 != it2->methods.end(); ++it3)
 				std::cout << *it3 << " ";
 			std::cout << std::endl;
 		}
 		std::cout << "\033[0;33;42m------------------\033[0m" << std::endl;
 	}
 }
-

@@ -1,52 +1,19 @@
-#include "Webserv.hpp"
-
-extern bool run;
-
-static void	signalHandler(int signum)
-{
-	(void)signum;
-	std::cout << std::endl << "SIGINT received, let's shut down the server" << std::endl;
-	run = false;
-}
+#include "../include/Webserv.hpp"
 
 int	main(int ac, char **av)
 {
-	signal(SIGINT, signalHandler);
-	if (ac > 2)
-	{
-		std::cerr << "Usage: ./webserv <config_file>" << std::endl;
-		return (1);
-	}
+	std::string	defaultConfigPath = "./config/default.conf";
+
 	if (ac == 2)
+		defaultConfigPath = av[1];
+	try
 	{
-		try
-		{
-			Configuration config(av[1]);
-			config.printConfig();
-			initiateWebServer(config);
-			runWebserver(config);
-		}
-		catch (std::exception &e)
-		{
-			std::cerr << "Error : " << e.what() << std::endl;
-			return (1);
-		}
+		Configuration	config(defaultConfigPath);
+		// config.printConfig();
+		runWebServer(config);
 	}
-	else
-	{
-		try
-		{
-			Configuration config;
-			config.printConfig();
-			initiateWebServer(config);
-			runWebserver(config);
-		}
-		catch (std::exception &e)
-		{
-			std::cerr << "Error: " << e.what() << std::endl;
-			return (1);
-		}
-		return (0);
+	catch (std::exception &e) {
+		std::cerr << e.what() << std::endl;
 	}
 	return (0);
 }

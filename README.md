@@ -18,11 +18,11 @@ Todo List - Webserv
 
 NEW TODOS:
 - Parsing:
-	- client_max_body_size can be set to 0, check the syntax how it can be defined in nginx config (Sets the maximum allowed size of the client request body. If the size in a request exceeds the configured value, the 413 (Request Entity Too Large) error is returned to the client. Please be aware that browsers cannot correctly display this error. Setting size to 0 disables checking of client request body size. )
 	- add the first (default) location block if there's no "location /" block set in the config
 - Errors handling:
 	- Proper status code everywhere (all requests) and verify that correct error pages are returned (default or custom)
 	- <s>Setup default error pages (add a file with them)</s>
+	- Sometimes we return 500 error page and the status code 404...
 - Connecting config and request:
 	- <s>Check host, port and server_names and have server block</s>
 	- <s>Inside server block check for location path and return either corrponding location or default location</s>
@@ -52,9 +52,31 @@ NEW TODOS:
 	- GET, POST, and DELETE methods
 	- multiple ports
 
+- Redirection
+	- using a return directive in file.conf block the server
+
+- be able to send a very big request (sometime with a big URI) and check that the server can handle it
+
 **Main parts of the project:**
 1. Server logic (loop)
 2. HTTP request (parsing)
 3. Configuration file (parsing)
 4. Creating response (analyze config and request)
 5. CGI
+
+
+Error cases:
+
+- When we launch the program and try to upload twice in a row it breaks everything (error 404 everywhere)
+
+- Search for all read/recv/write/send on a socket and check that, if an error is returned, the client is removed.
+
+- Limit the client body (use: curl -X POST -H "Content-Type: plain/text" --data "BODY IS HERE write something shorter or longer than body limit").
+
+- In the configuration, try to setup the same port multiple times. It should not work.
+
+- Launch multiple servers at the same time with different configurations but with common ports. Does it work? If it does, ask why the server should work if one of the configurations isn't functional. Keep going.
+
+- You can use a script containing an infinite loop or an error; you are free to do whatever tests you want within the limits of acceptability that remain at your discretion. The group being evaluated should help you with this. METTRE UN TIMEOUT SUR LE SCRIPT POUR PAS RESTER BLOQUE
+
+- Check that when we accept connections we don't have more clients than the maximum number of clients allowed. (here we never check that NewClientFd is not > than the max number of clients)

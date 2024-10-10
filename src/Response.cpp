@@ -1,6 +1,7 @@
 #include "Response.hpp"
+#include "Webserv.hpp"
 
-Response::Response() {};
+Response::Response() : statusCode(0) {};
 
 Response::Response(Request &req) : req(req), statusCode(0) {};
 
@@ -16,10 +17,9 @@ void Response::setBody(std::string const &body)
 	this->body = body;
 }
 
-// change this to setErrorBody ?
 void Response::setErrorBody(LocationBlock location)
 {
-	if (location.errorPages.empty())
+	if (location.errorPages.empty() || location.errorPages.find(intToString(this->statusCode)) == location.errorPages.end())
 	{
 		body = getDefaultErrorBody(this->statusCode);
 	}
@@ -64,11 +64,15 @@ void Response::createResponseStr(LocationBlock location)
 	std::stringstream ss;
 	setStatusLine();
 	if (this->statusCode >= 400)
+	{
 		setErrorBody(location);
+		setMimeType("html");
+	}
 	setHeaders(location);
 	ss << statusLine << headers << body << LF;
 	response = ss.str();
 }
+
 void Response::setMimeType(std::string const &fileName)
 {
 	if (fileName == "html")
@@ -116,10 +120,10 @@ void Response::setMimeType(std::string const &fileName)
 	else
 		mimeType = "application/octet-stream";
 }
+
 void Response::setHeaders(LocationBlock location)
 {
 	std::stringstream ss;
-	// add text/html as a default mime type (for default errors) ?
 	ss << "Content-Type: " << mimeType << CRLF
 	   << "Content-Length: " << body.size() << CRLF;
 	if (location.redirection)
@@ -133,7 +137,6 @@ void Response::setHeaders(LocationBlock location)
 void Response::getBody(std::string uri, LocationBlock location)
 {
 	std::string path = setPath(location, uri);
-	std::cout << "Path: " << path << std::endl;
 	if (isDirectory(path))
 	{
 		DIR *directoryPtr = opendir(path.c_str());
@@ -163,11 +166,11 @@ void Response::getBody(std::string uri, LocationBlock location)
 				std::string fileName = dir->d_name;
 				if (fileName == "." || fileName == "..")
 					continue;
-				if (hasDefaultFile(path, fileName, location))
+				if (hasDefaultFile(path, location))
 				{
 					if (!isInIndex(fileName, location))
 						continue;
-					std::ifstream file(getFilePath(path, uri, fileName).c_str());
+					std::ifstream file(getFilePath(path, fileName).c_str());
 					if (file.is_open())
 					{
 						std::stringstream body;
@@ -198,7 +201,7 @@ void Response::getBody(std::string uri, LocationBlock location)
 			}
 		}
 		if (this->statusCode == 0)
-			this->statusCode = 404;
+			this->statusCode = 403;
 		closedir(directoryPtr);
 	}
 	else if (isFile(path))
@@ -222,39 +225,151 @@ void Response::getBody(std::string uri, LocationBlock location)
 		this->statusCode = 404;
 }
 
-void Response::handleGetRequest(Configuration &config, LocationBlock location)
+std::string parseFileName(std::string body, std::string keyword)
 {
-	if (location.cgiParams.empty())
+	size_t pos = body.find(keyword);
+	if (pos == std::string::npos)
 	{
-		getBody(req.getUri(), location);
-		return;
+		std::cerr << "Could not find keyword " << keyword << " in body" << std::endl;
+		return "";
 	}
-	handleCGI(config, location, req, *this);
-	// handle cgi
+	pos += keyword.length();
+	size_t endPos = body.find(CRLF, pos);
+	if (endPos == std::string::npos)
+	{
+		std::cerr << "Could not find end of line in body" << std::endl;
+		return "";
+	}
+	std::string fileName = body.substr(pos, endPos - 1 - pos);
+	if (!fileName.empty() && fileName[fileName.size() - 1] == CR)
+		fileName.erase(fileName.size() - 1);
+	return fileName;
 }
 
-void Response::handlePostRequest(Configuration &config, LocationBlock locaion)
+void Response::handleUploadFiles(LocationBlock &location, Request &req)
 {
-	if (locaion.cgiParams.empty())
+	std::string body = req.getBody();
+	if (location.uploadLocation.empty())
 	{
-		this->statusCode = 405;
+		this->statusCode = 404;
 		return;
 	}
-	// handle cgi
-	handleCGI(config, locaion, req, *this);
+	DIR *dir = opendir(location.uploadLocation.c_str());
+	if (dir == NULL)
+	{
+		if (errno == ENOENT)
+		{
+			this->statusCode = 404;
+			return;
+		}
+		else if (errno == EACCES)
+		{
+			this->statusCode = 403;
+			return;
+		}
+		else
+		{
+			this->statusCode = 500;
+			return;
+		}
+	}
+	else
+	{
+		std::string fileName = "";
+		std::string contentType = getContentType(req.getHeaders()["Content-Type"]);
+		if (contentType == "multipart/form-data")
+			fileName = parseFileName(body, "filename=\"");
+		if (!fileName.empty())
+		{
+			if (fileName[0] == '/')
+				fileName = fileName.substr(1);
+		}
+		else
+		{
+			this->statusCode = 400;
+			closedir(dir);
+			return;
+		}
+		if (checkIfFileExists(location.uploadLocation, fileName) == 0)
+		{
+			this->statusCode = 409;
+			closedir(dir);
+			return;
+		}
+		if (chdir(location.uploadLocation.c_str()) == -1)
+		{
+			this->statusCode = 403;
+			closedir(dir);
+			return;
+		}
+		std::ofstream file(fileName.c_str());
+		if (!file.is_open())
+		{
+			this->statusCode = 403;
+			closedir(dir);
+			changeDirBack(location.uploadLocation);
+			return;
+		}
+		std::string fileContent = getFileContent(req.getBody(), req);
+		file << fileContent;
+		file.close();
+		this->statusCode = 201;
+		changeDirBack(location.uploadLocation);
+	}
+	closedir(dir);
+}
+void Response::handleGetRequest(LocationBlock location)
+{
+	if (needsCGI(location, req))
+	{
+		handleCGI(location, req, *this);
+		return;
+	}
+	getBody(req.getUri(), location);
 	return;
 }
 
-void Response::handleDeleteRequest(Configuration &config, LocationBlock location)
+void Response::handlePostRequest(LocationBlock location)
 {
-	if (location.cgiParams.empty())
+	if (needsCGI(location, req))
 	{
-		this->statusCode = 405;
+		handleCGI(location, req, *this);
 		return;
 	}
-	// handle delete
-	handleCGI(config, location, req, *this);	
+	handleUploadFiles(location, req);
+	body = uploadSuccess;
+	setMimeType("html");
 	return;
+}
+
+void Response::handleDeleteRequest(LocationBlock location)
+{
+	if (needsCGI(location, req))
+	{
+		handleCGI(location, req, *this);
+		return;
+	}
+	std::string uri = req.getUri();
+	std::string filePath = location.root + uri;
+	struct stat fileStat;
+	if (stat(filePath.c_str(), &fileStat) == -1)
+	{
+		this->statusCode = 404;
+		setMimeType("html");
+		return;
+	}
+	else
+	{
+		if (remove(filePath.c_str()) != 0)
+		{
+			this->statusCode = 500;
+			return;
+		}
+		body = deleteSuccess;
+		setMimeType("html");
+		this->statusCode = 200;
+		return;
+	}
 }
 
 void Response::methodCheck(LocationBlock location)
@@ -275,48 +390,65 @@ void Response::bodySizeCheck(Configuration &config, LocationBlock &location)
 	int maxBodySize = config.getBodySize(location.clientMaxBodySize);
 	if (maxBodySize == 0)
 		return;
-	// compare with content length header!!!
-	if (req.getBody().size() > maxBodySize)
+	std::string contentLength = req.getHeaders()["Content-Length"];
+	if (stringToInt(contentLength) > maxBodySize)
 	{
 		if (this->statusCode == 0)
 			this->statusCode = 413;
 	}
 }
 
-std::string Response::handleRedirection(Configuration &config, LocationBlock &location)
+std::string Response::handleRedirection(LocationBlock &location)
 {
 	std::stringstream ss;
 	body = "";
 	setMimeType("html");
-	statusCode = 307;
+	this->statusCode = 307;
 	setStatusLine();
 	setHeaders(location);
 	createResponseStr(location);
 	return response;
 }
-
+void printRequest(Request &req)
+{
+	std::cerr << std::string(21, '*') << std::endl;
+	std::cerr << "Method: " << req.getMethod() << std::endl;
+	std::cerr << "URI: " << req.getUri() << std::endl;
+	std::cerr << "Version: " << req.getVersion() << std::endl;
+	std::cerr << "Headers: " << std::endl;
+	std::map<std::string, std::string> headers = req.getHeaders();
+	for (std::map<std::string, std::string>::iterator it = headers.begin(); it != headers.end(); ++it)
+	{
+		std::cerr << it->first << ":" << it->second << std::endl;
+	}
+	std::cerr << "Body: " << std::endl;
+	std::cerr << req.getBody() << std::endl;
+	std::cerr << std::endl;
+	std::cerr << std::string(21, '*') << std::endl;
+}
 std::string Response::getResponse(Configuration &config)
 {
 	LocationBlock location;
+	initLocationBlock(location);
 	if (serverBlockExists(config, this->req))
 	{
 		location = getLocationFromServer(config, this->req);
 		methodCheck(location);
 		bodySizeCheck(config, location);
 		if (location.redirection == true)
-			return (handleRedirection(config, location));
+			return (handleRedirection(location));
 		if (this->statusCode == 0)
 		{
 			switch (req.getMethod())
 			{
 			case GET:
-				handleGetRequest(config, location);
+				handleGetRequest(location);
 				break;
 			case POST:
-				handlePostRequest(config, location);
+				handlePostRequest(location);
 				break;
 			case DELETE:
-				handleDeleteRequest(config, location);
+				handleDeleteRequest(location);
 				break;
 			}
 		}
@@ -324,80 +456,6 @@ std::string Response::getResponse(Configuration &config)
 	createResponseStr(location);
 	return response;
 }
-
-void Response::handleRoot(std::string configPath, std::string requestUri)
-{
-	DIR *directoryPtr = opendir(configPath.c_str());
-	if (directoryPtr == NULL)
-	{
-		if (errno == ENOENT)
-		{
-			this->statusCode = 404;
-			return;
-		}
-		else if (errno == EACCES)
-		{
-			this->statusCode = 403;
-			return;
-		}
-		else
-		{
-			this->statusCode = 500;
-			return;
-		}
-	}
-	else
-	{
-		struct dirent *dir;
-		while ((dir = readdir(directoryPtr)) != NULL)
-		{
-			std::string fileName = dir->d_name;
-			std::cout << "fileName: " << fileName << std::endl;
-			if (fileName == "." || fileName == "..")
-				continue;
-			std::string filePath = configPath + "/" + fileName;
-			if (requestUri == "/")
-			{
-				filePath = configPath + "/" + "index.html";
-			}
-			if (requestUri == "/" || requestUri == "/" + fileName)
-			{
-				std::ifstream file(filePath.c_str());
-				std::stringstream body;
-				if (file.is_open())
-				{
-					std::string line;
-					while (std::getline(file, line))
-					{
-						body << line << std::endl;
-					}
-					file.close();
-					this->body = body.str();
-					if (requestUri == "/")
-					{
-						this->setMimeType("index.html");
-					}
-					else
-					{
-						this->setMimeType(fileName);
-					}
-					this->statusCode = 200;
-					break;
-				}
-				else
-				{
-					this->statusCode = 403;
-					break;
-				}
-			}
-		}
-		if (this->statusCode == 0)
-		{
-			this->statusCode = 404;
-		}
-		closedir(directoryPtr);
-	}
-};
 
 LocationBlock Response::getLocationFromServer(Configuration &config, Request &req)
 {
@@ -418,4 +476,13 @@ LocationBlock Response::getLocationFromServer(Configuration &config, Request &re
 	else
 		location = getMatchingLocationBlock(serverBlock, "/");
 	return location;
+}
+
+void Response::clearResponse(void)
+{
+	this->statusCode = 0;
+	this->headers.clear();
+	this->body.clear();
+	this->response.clear();
+	this->mimeType.clear();
 }

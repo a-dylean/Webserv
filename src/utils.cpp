@@ -8,6 +8,14 @@ std::string intToString(int value)
 	return ss.str();
 }
 
+int stringToInt(const std::string &str)
+{
+	std::stringstream ss(str);
+	int value;
+	ss >> value;
+	return value;
+}
+
 bool isDirectory(const std::string &path)
 {
 	struct stat s;
@@ -36,7 +44,7 @@ bool serverBlockExists(Configuration &config, Request &req)
 	int port = req.getPort();
 	for (std::vector<ServerBlock>::iterator it = serverBlocks.begin(); it != serverBlocks.end(); it++)
 	{
-		if (it->host == host && it->port == port)
+		if (it->hostPort.first == host && it->hostPort.second == port)
 			return true;
 	}
 	return false;
@@ -47,7 +55,7 @@ int serverBlocksCount(Configuration &config, std::string host, int port)
 	std::vector<ServerBlock> serverBlocks = config.getServerBlocks();
 	for (std::vector<ServerBlock>::iterator it = serverBlocks.begin(); it != serverBlocks.end(); it++)
 	{
-		if (it->host == host && it->port == port)
+		if (it->hostPort.first == host && it->hostPort.second == port)
 			count++;
 	}
 	return count;
@@ -59,7 +67,7 @@ ServerBlock getDefaultServerBlock(Configuration &config, std::string host, int p
 	std::vector<ServerBlock> serverBlocks = config.getServerBlocks();
 	for (std::vector<ServerBlock>::iterator it = serverBlocks.begin(); it != serverBlocks.end(); it++)
 	{
-		if (it->host == host && it->port == port)
+		if (it->hostPort.first == host && it->hostPort.second == port)
 			return *it;
 	}
 	return *serverBlock;
@@ -72,7 +80,7 @@ bool matchExists(Configuration &config, std::string host, int port)
 	{
 		for (std::vector<std::string>::iterator it2 = it->serverNames.begin(); it2 != it->serverNames.end(); ++it2)
 		{
-			if (it->host == host && it->port == port && *it2 == host)
+			if (it->hostPort.first == host && it->hostPort.second == port && *it2 == host)
 				return true;
 		}
 	}
@@ -87,7 +95,7 @@ ServerBlock getMatchingServerBlock(Configuration &config, std::string host, int 
 	{
 		for (std::vector<std::string>::iterator it2 = it->serverNames.begin(); it2 != it->serverNames.end(); ++it2)
 		{
-			if (it->host == host && it->port == port && *it2 == host)
+			if (it->hostPort.first == host && it->hostPort.second == port && *it2 == host)
 				return *it;
 		}
 	}
@@ -126,7 +134,7 @@ LocationBlock getMatchingLocationBlock(ServerBlock serverBlock, std::string uri)
     if (pos != std::string::npos && pos != 0) {
         return getMatchingLocationBlock(serverBlock, uri.substr(0, pos));
     }
-	return *location;
+	return *location;// TODO : maybe replace with throw and catch it in the main without stopping the server
 }
 
 std::string getDefaultErrorBody(int statusCode)
@@ -150,7 +158,7 @@ bool isInIndex(std::string fileName, LocationBlock location)
 	return false;
 }
 
-bool hasDefaultFile(const std::string &directoryPath, std::string fileName, LocationBlock location)
+bool hasDefaultFile(const std::string &directoryPath, LocationBlock location)
 {
 	DIR *directoryPtr = opendir(directoryPath.c_str());
 	struct dirent *dir;
@@ -179,15 +187,15 @@ bool hasDefaultFile(const std::string &directoryPath, std::string fileName, Loca
 	return false;
 }
 
-std::string getFilePath(std::string path, std::string uri, std::string fileName)
+std::string getFilePath(std::string path, std::string fileName)
 {
 	std::string filePath;
 	if (path[path.size() - 1] != '/')
 		path += "/";
-	if (uri != "/")
+	// if (uri != "/")
 		filePath = path + fileName;
-	else
-		filePath = path + "index.html";
+	// else
+	// 	filePath = path + "index.html";
 	return filePath;
 }
 
@@ -260,4 +268,120 @@ std::string setPath(LocationBlock location, std::string uri)
 		}
 	}
 	return path;
+}
+
+int checkIfFileExists(const std::string &dirPath, std::string targetFileName) 
+{
+    DIR *dir = opendir(dirPath.c_str());
+    if (dir == NULL) 
+	{
+        std::cerr << "Error: Could not open directory " << dirPath << std::endl;
+        return -1;
+    }
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL) 
+	{
+        if (entry->d_name == targetFileName) 
+		{
+            closedir(dir);
+            return 0; //true
+        }
+    }
+    closedir(dir);
+    return 1; //false
+}
+
+static std::string getContentBetweenBoundaries(std::string body, size_t firstBoundaryPos, size_t secondBoundaryPos)
+{
+	size_t contentStartPos = firstBoundaryPos + 2; // +2 to skip \r\n
+	size_t contentEndPos = secondBoundaryPos - 2; // -2 to skip \r\n
+	std::string content = body.substr(contentStartPos, contentEndPos - contentStartPos);
+	return content;
+}
+
+std::string getContentType(const std::string &contentType)
+{
+    size_t pos = contentType.find(";");
+    if (pos == std::string::npos)
+        return "";
+
+    std::string type = contentType.substr(0, pos);
+    return type;
+}
+
+int getNbBoundaries(std::string body, std::string boundary)
+{
+	int count = 0;
+	size_t pos = 0;
+	while ((pos = body.find(boundary, pos)) != std::string::npos)
+	{
+		count++;
+		pos += boundary.length();
+	}
+	return count;
+}
+
+std::string getFileBody(std::string body, std::string &boundary)
+{
+	std::string fileBody;
+	int nbBoundaries = getNbBoundaries(body, boundary);
+	if (nbBoundaries < 2)
+		return "";
+	
+	size_t firstBoundaryPos = body.find(boundary);
+	if (firstBoundaryPos == std::string::npos)
+		return "";
+	size_t secondBoundaryPos = body.find(boundary, firstBoundaryPos + boundary.length());
+	if (secondBoundaryPos == std::string::npos)
+		return "";
+	fileBody = getContentBetweenBoundaries(body, firstBoundaryPos, secondBoundaryPos);
+	return fileBody;
+}
+
+std::string getFileContent(std::string body, Request &req)
+{
+	std::string contentType = getContentType(req.getHeaders()["Content-Type"]);
+	if (contentType != "multipart/form-data")
+		return body;
+
+	std::string boundary = body.substr(0, body.find(CRLF));
+	if (boundary.empty())
+		return "";
+	std::string fileBody = getFileBody(body, boundary);
+	if (fileBody.empty())
+		return "";
+	size_t contentStartPos = fileBody.find("\r\n\r\n") + 4;
+	if (contentStartPos == std::string::npos)
+		return "";
+	size_t contentEndPos = fileBody.find(CRLF) - 2;
+	std::string fileContent = fileBody.substr(contentStartPos, contentEndPos - contentStartPos);
+	if (fileBody.empty())
+		return "";
+	return fileContent;
+}
+
+static int countSlashes(std::string path)
+{
+	int count = 0;
+	for (size_t i = 0; i < path.size(); i++)
+	{
+		if (path[i] == '/')
+			count++;
+	}
+	if (path[path.size() - 1] == '/')
+		count--;
+	return count;
+}
+
+void changeDirBack(std::string path)
+{
+	int slashes = countSlashes(path);
+	for (int i = 0; i < slashes; i++)
+	{
+		if (chdir("../") == -1)
+		{
+			std::cerr << "Error: Could not change directory back." << std::endl;
+			return;
+		}
+	}
 }

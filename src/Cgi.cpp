@@ -1,169 +1,177 @@
 #include "Cgi.hpp"
 
-void printCgiParams(const std::map<std::string, std::string>& cgiParams) {
-    for (const auto& param : cgiParams) {
-        std::cout << param.first << ": " << param.second << std::endl;
+bool needsCGI(LocationBlock location, Request &req)
+{
+    std::string uri = req.getUri();
+    if (!location.cgiExtensions.empty())
+    {
+        for (std::vector<std::string>::iterator it = location.cgiExtensions.begin(); it != location.cgiExtensions.end(); it++)
+        {
+            size_t extentionSize = (*it).size();
+            if (uri.size() >= extentionSize && uri.substr(uri.size() - extentionSize) == *it && !isDirectory(location.root + uri))
+            {
+                return true;
+            }
+        }
     }
+    return false;
 }
 
-// we need to merge
-// we need to be clear with what's inside env
-
-// ENV
-/*
-method type : GET, POST, DELETE
-body : body of the request
-// query string : query string of the request ?? maybe no time
-content length : length of the body
-upload location : location of the file to upload
-*/
-
-
-	// create char **env from the request with vars
-	// use excve (pass env) in a fork to run the script and be able to receive the exit status (error, success, or more)
-	// python script
-
-static char	**createEnv(Request &req, LocationBlock &location)
+void freeEnv(char **env)
 {
-	char	**env = new char*[5];
-
-	env[0] = strdup("REQUEST_METHOD=GET");
-	env[1] = strdup("CONTENT_LENGTH=42");
-	env[2] = strdup("CONTENT_TYPE=text/html");
-	env[3] = strdup("UPLOAD_LOCATION=./uploads");
-	env[4] = NULL;
-	
-	for (int j = 0; env[j]; j++)
-	{
-		std::cout << "env[" << j << "] : " << env[j] << std::endl;
-	}
-
-	return (env);
+    for (int i = 0; env[i] != NULL; i++)
+    {
+        free(env[i]);
+    }
+    delete[] env;
+}
+std::string createEnvVar(const std::string &key, const std::string &value)
+{
+    std::stringstream ss;
+    ss << key << "=" << value;
+    return ss.str();
 }
 
-// void handleCGI(Configuration &Config, LocationBlock &location, Request &req, Response &res)
-// {
-// 	//create environment
-// 	//run script
-// 	//get output
-// 	//set output as body
-// 	//set status code
-// 	//set mime type
-// 	//set headers
-// 	//set status line
-// 	//set response
-// 	printCgiParams(location.cgiParams);
-// 	char **env = createEnv(req, location);
-// 	std::string cgiPathWithArgs = "./www/cgi-bin/test.py";
-// 	std::string cgiOutput;
-// 	std::cout << "CGI PATH: " << cgiPathWithArgs << std::endl;
-	
-
-	
-	
-// 	// FILE *fp = popen(cgiPathWithArgs.c_str(), "r");
-// 	// if (fp == NULL)
-// 	// {
-// 	// 	res.setStatusCode(500);
-// 	// 	return;
-// 	// }
-// 	// char buf[128];
-// 	// while (fgets(buf, sizeof(buf), fp) != NULL)
-// 	// {
-// 	// 	cgiOutput += buf;
-// 	// }
-// 	// pclose(fp);
-// 	int pid = fork();
-
-// 	if (pid == -1)
-// 	{
-// 		std::cerr << "fork failed" << std::endl;
-// 		exit(1);
-// 	}
-// 	else if (pid == 0)
-// 	{
-// 		// child
-// 		std::cout << "child" << std::endl;
-// 		char *args[] = {strdup(cgiPathWithArgs.c_str()), NULL};
-// 		execve(cgiPathWithArgs.c_str(), args, env);
-// 		exit(0);
-// 	}
-// 	else
-// 	{
-// 		// parent
-// 		std::cout << "parent" << std::endl;
-// 		int status;
-// 		waitpid(pid, &status, 0);
-// 		if (WIFEXITED(status))
-// 		{
-// 			std::cout << "child exited with status: " << WEXITSTATUS(status) << std::endl;
-// 		}
-// 	}
-
-
-// 	res.setBody(cgiOutput);
-// 	res.setMimeType("html");
-// 	res.setStatusCode(200);
-// };
-
-void handleCGI(Configuration &config, LocationBlock &location, Request &req, Response &res)
+char **createEnv(Request &req, LocationBlock &location)
 {
-    printCgiParams(location.cgiParams);
+    std::vector<std::string> envVars;
+    envVars.push_back(createEnvVar("CONTENT_LENGTH", intToString(req.getBody().size())));
+    envVars.push_back(createEnvVar("CONTENT_TYPE", req.getHeaders()["Content-Type"]));
+    envVars.push_back(createEnvVar("UPLOAD_LOCATION", location.uploadLocation));
+    envVars.push_back(createEnvVar("REQUEST_METHOD", intToString(req.getMethod())));
+    envVars.push_back(createEnvVar("QUERY_STRING", req.getBody() + CRLF));
+
+    char **env = new char *[envVars.size() + 1];
+    for (size_t i = 0; i < envVars.size(); ++i)
+    {
+        env[i] = strdup(envVars[i].c_str());
+    }
+    env[envVars.size()] = NULL;
+    return env;
+}
+
+void handleCGI(LocationBlock &location, Request &req, Response &res)
+{
     char **env = createEnv(req, location);
-    std::string cgiPathWithArgs = "./www/cgi-bin/test.py";
+    std::string cgiPathWithArgs = location.root + req.getUri();
     std::stringstream cgiOutput;
-    std::cout << "CGI PATH: " << cgiPathWithArgs << std::endl;
-
+    struct stat st;
+    if ((stat(cgiPathWithArgs.c_str(), &st) != 0))
+    {
+        std::cerr << "file does not exist" << std::endl;
+        res.setStatusCode(404);
+        return;
+    }
+    else
+    {
+        if (!(st.st_mode & S_IXUSR))
+        {
+            std::cerr << "file is not executable" << std::endl;
+            res.setStatusCode(403);
+            freeEnv(env);
+            return;
+        }
+    }
     int pipefd[2];
     if (pipe(pipefd) == -1)
     {
         std::cerr << "pipe failed" << std::endl;
         res.setStatusCode(500);
+        freeEnv(env);
         return;
     }
-
     int pid = fork();
-
     if (pid == -1)
     {
         std::cerr << "fork failed" << std::endl;
         res.setStatusCode(500);
+        freeEnv(env);
         return;
     }
     else if (pid == 0)
     {
-        // Child process
-        close(pipefd[0]); // Close unused read end
-        dup2(pipefd[1], STDOUT_FILENO); // Redirect stdout to pipe
-        dup2(pipefd[1], STDERR_FILENO); // Redirect stderr to pipe
-        close(pipefd[1]); // Close write end after duplicating
-
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
         char *args[] = {strdup(cgiPathWithArgs.c_str()), NULL};
         execve(cgiPathWithArgs.c_str(), args, env);
-        exit(1); // execve failed
+        exit(1);
     }
     else
     {
-        // Parent process
-        close(pipefd[1]); // Close unused write end
+        close(pipefd[1]);
         char buffer[128];
         ssize_t bytesRead;
-        while ((bytesRead = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0)
-        {
-            buffer[bytesRead] = '\0';
-            cgiOutput << buffer;
-        }
-        close(pipefd[0]); // Close read end
-
+        fd_set readfds;
+        struct timeval timeout;
         int status;
-        waitpid(pid, &status, 0);
-        if (WIFEXITED(status))
-        {
-            std::cout << "child exited with status: " << WEXITSTATUS(status) << std::endl;
-        }
 
-        res.setBody(cgiOutput.str()); // create a parsing function to parse the output and set correctly body and headers
-        res.setMimeType("html");
-        res.setStatusCode(200);
+        timeout.tv_sec = CGITIMEOUT;
+        timeout.tv_usec = 0;
+
+        while (true)
+        {
+            FD_ZERO(&readfds);
+            FD_SET(pipefd[0], &readfds);
+            //select can be used only once, change thiiiis
+            int ret = select(pipefd[0] + 1, &readfds, NULL, NULL, &timeout);
+            if (ret == -1)
+            {
+                std::cerr << "select failed" << std::endl;
+                res.setStatusCode(500);
+                close(pipefd[0]);
+                kill(pid, SIGKILL);
+                waitpid(pid, &status, 0);
+                freeEnv(env);
+                return;
+            }
+            else if (ret == 0)
+            {
+                std::cerr << "CGI process timed out" << std::endl;
+                res.setStatusCode(504);
+                close(pipefd[0]);
+                kill(pid, SIGKILL);
+                waitpid(pid, &status, 0);
+                freeEnv(env);
+                return;
+            }
+            else
+            {
+                if (FD_ISSET(pipefd[0], &readfds))
+                {
+                    bytesRead = read(pipefd[0], buffer, sizeof(buffer) - 1);
+                    if (bytesRead <= 0)
+                        break;
+                    buffer[bytesRead] = '\0';
+                    cgiOutput << buffer;
+                }
+            }
+        }
+        close(pipefd[0]);
+        waitpid(pid, &status, 0);
+        if (cgiOutput.str().empty())
+        {
+            std::cerr << "empty output" << std::endl;
+            res.setStatusCode(500);
+            return;
+        }
+        else if (WEXITSTATUS(status) != 0)
+        {
+            std::cout << "exit error" << std::endl;
+            res.setStatusCode(500);
+            return;
+        }
+        else
+        {
+            std::string output = cgiOutput.str();
+            size_t pos = output.find("Content-Type: text/html");
+            if (pos != std::string::npos)
+                output.erase(pos, std::string("Content-Type: text/html").length());
+            cgiOutput.str(output);
+            res.setBody(cgiOutput.str());
+            res.setMimeType("html");
+            res.setStatusCode(200);
+        }
     }
+    freeEnv(env);
 }

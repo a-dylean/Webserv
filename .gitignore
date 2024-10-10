@@ -4,3 +4,5 @@ bin/
 .vscode
 webserv
 *.hpp.gch
+out
+outfile

@@ -4,10 +4,10 @@ import sys
 def test_web_server(url):
     try:
         # Send a GET request to the specified URL
-        # response = requests.get(url)
+        response = requests.get(url)
         # Send a POST request to the specified URL
-        myobj = {'somekey': 'somevalue'}
-        response = requests.post(url, json = myobj)
+        # myobj = {'somekey': 'somevalue'}
+        # response = requests.post(url, json = myobj)
         # Print the status code of the response
         print(f"Status Code: {response.status_code}")
 
